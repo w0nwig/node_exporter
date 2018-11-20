@@ -121,35 +121,47 @@ func (crs *containerRateStats) Update(ch chan<- prometheus.Metric) error {
 		if container.Spec.HasCpu {
 			desc := prometheus.NewDesc("container_cpu_user_usage_rate", "container_cpu_user_usage_rate", labels, nil)
 			cpu_user_usage := stats[1].Cpu.Usage.User - stats[0].Cpu.Usage.User
-			user_usage_rate := 1000 * float64(cpu_user_usage) / float64(time_delta)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(user_usage_rate), values...)
+			if cpu_user_usage > 0 {
+				user_usage_rate := float64(cpu_user_usage) / float64(time_delta)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(user_usage_rate), values...)
+			}
 
 			desc = prometheus.NewDesc("container_cpu_system_usage_rate", "container_cpu_system_usage_rate", labels, nil)
 			cpu_system_usage := stats[1].Cpu.Usage.System - stats[0].Cpu.Usage.System
-			system_usage_rate := 1000 * float64(cpu_system_usage) / float64(time_delta)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(system_usage_rate), values...)
+			if cpu_system_usage > 0 {
+				system_usage_rate := float64(cpu_system_usage) / float64(time_delta)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(system_usage_rate), values...)
+			}
 
 			desc = prometheus.NewDesc("container_cpu_usage_rate", "container_cpu_usage_rate", labels, nil)
 			cpu_usage := stats[1].Cpu.Usage.Total - stats[0].Cpu.Usage.Total
-			cpu_usage_rate := 1000 * float64(cpu_usage) / float64(time_delta)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(cpu_usage_rate), values...)
+			if cpu_usage > 0 {
+				cpu_usage_rate := float64(cpu_usage) / float64(time_delta)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(cpu_usage_rate), values...)
+			}
 
 			desc = prometheus.NewDesc("container_cpu_cfs_rate", "container_cpu_cfs_rate", labels, nil)
 			cfs_usage := stats[1].Cpu.CFS.ThrottledTime - stats[0].Cpu.CFS.ThrottledTime
-			cfs_usage_rate := float64(cfs_usage) / float64(time_delta)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(cfs_usage_rate), values...)
+			if cfs_usage > 0 {
+				cfs_usage_rate := float64(cfs_usage) / float64(time_delta)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(cfs_usage_rate), values...)
+			}
 		}
 
 		if container.Spec.HasNetwork {
 			desc := prometheus.NewDesc("container_network_receive_bytes_rate", "container_network_receive_bytes_total", labels, nil)
 			rx_total := stats[1].Network.RxBytes - stats[0].Network.RxBytes
-			rx_rate := float64(rx_total) / float64(time_delta)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(rx_rate), values...)
+			if rx_total > 0 {
+				rx_rate := float64(rx_total) / float64(time_delta)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(rx_rate), values...)
+			}
 
 			desc = prometheus.NewDesc("container_network_transmit_bytes_rate", "container_network_transmit_bytes_total", labels, nil)
 			tx_total := stats[1].Network.TxBytes - stats[0].Network.TxBytes
-			tx_rate := float64(tx_total) / float64(time_delta)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(tx_rate), values...)
+			if tx_total > 0 {
+				tx_rate := float64(tx_total) / float64(time_delta)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(tx_rate), values...)
+			}
 		}
 
 	}
