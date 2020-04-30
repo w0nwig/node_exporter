@@ -15,6 +15,7 @@ package collector
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	cadvisor "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/metrics"
@@ -23,6 +24,7 @@ import (
 	"github.com/prometheus/common/log"
 	"io/ioutil"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"net"
 	"net/http"
 	"regexp"
 )
@@ -49,6 +51,25 @@ func NewContainerRateStatsCollector() (Collector, error) {
 }
 
 func (crs *containerRateStats) Update(ch chan<- prometheus.Metric) error {
+	netInterfaces, err := net.Interfaces()
+	if err != nil {
+		log.Info("net.Interfaces failed, err:", err.Error())
+	}
+	var hostIp = ""
+	for i := 0; i < len(netInterfaces); i++ {
+		if netInterfaces[i].Name == "eth0" {
+			addrs, _ := netInterfaces[i].Addrs()
+			for _, address := range addrs {
+				if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+
+					if ipnet.IP.To4() != nil {
+						hostIp = ipnet.IP.String()
+					}
+				}
+			}
+		}
+	}
+
 	// Request data from all subcontainers.
 	request := cadvisorRequest{
 		ContainerName: "/",
@@ -60,15 +81,16 @@ func (crs *containerRateStats) Update(ch chan<- prometheus.Metric) error {
 		log.Errorf("failed to marshal containers stats: %v", err)
 		return err
 	}
-	req, err := http.NewRequest("POST", "http://127.0.0.1:10255/stats/container", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", "https://" + hostIp + ":10250/stats/container", bytes.NewBuffer(body))
 	if err != nil {
 		log.Errorf("failed to request to stats containers: %v", err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJub2RlLWV4cG9ydGVyLXRva2VuLTQ4bTdzIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6Im5vZGUtZXhwb3J0ZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIwNzQ0NDE0Mi1jOTNlLTExZTktODZlNS1mYTE2M2U4ZWMwYTkiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZS1zeXN0ZW06bm9kZS1leHBvcnRlciJ9.Jc-CtotPj1HfD4DVsfU361dwvxicYAvel9dXVz78HTywaz7sOFb4epz4IYbwTBjoQ2ak_4zYYSFmgisY6-b0RklvdIZIZjVnpTaB3RAbmShsd8xwAGtx89hvMqFb2JDgmbretTF79E3ByGkAK4AtRNEJbRmwRrfkoX5KtnT7KfkBNUGE5xpAd64WOKrGRH8pv6DezGPyQMWuNSYBymz1-RhNRILTAFQmTyETZYrT9u81SYvXC9RzB-S3EYvFxzIDzS5VrDSziICRbQZ6CW9Z5gQtd0LV_i5BEtHybciky_jQRv_q8m4Njm3kC8C4Kl_xkbtoXtgBePYstZ3YiftJ1Q")
 
 	var containers map[string]cadvisor.ContainerInfo
-	err = crs.postRequestAndGetValue(crs.c, req, &containers)
+	err = crs.postRequestAndGetValue(req, &containers)
 	if err != nil {
 		return fmt.Errorf("failed to get all container stats from Kubelet: %v", err)
 	}
@@ -169,7 +191,11 @@ func (crs *containerRateStats) Update(ch chan<- prometheus.Metric) error {
 	return nil
 }
 
-func (crs *containerRateStats) postRequestAndGetValue(client *http.Client, req *http.Request, value interface{}) error {
+func (crs *containerRateStats) postRequestAndGetValue(req *http.Request, value interface{}) error {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	response, err := client.Do(req)
 	if err != nil {
 		return err
