@@ -73,7 +73,7 @@ func (crs *containerRateStats) Update(ch chan<- prometheus.Metric) error {
 		return fmt.Errorf("failed to get all container stats from Kubelet: %v", err)
 	}
 
-	log.Infof("containers length: %d", len(containers))
+	//log.Infof("containers length: %d", len(containers))
 	result := make([]cadvisor.ContainerInfo, 0, len(containers))
 	for _, containerInfo := range containers {
 		cont := crs.parseStat(&containerInfo)
@@ -95,7 +95,7 @@ func (crs *containerRateStats) Update(ch chan<- prometheus.Metric) error {
 
 	for _, container := range result {
 
-		log.Infof("stats length %d", len(container.Stats))
+		//log.Infof("stats length %d", len(container.Stats))
 
 		// Now for the actual metrics
 		if len(container.Stats) < 2 {
@@ -108,7 +108,7 @@ func (crs *containerRateStats) Update(ch chan<- prometheus.Metric) error {
 		labels := make([]string, 0, len(rawLabels))
 		containerLabels := containerPrometheusLabelsFunc(&container)
 		if containerLabels == nil {
-			log.Info("not found labels and continue.")
+			//log.Info("not found labels and continue.")
 			continue
 		}
 		for l := range rawLabels {
@@ -185,11 +185,11 @@ func (crs *containerRateStats) postRequestAndGetValue(client *http.Client, req *
 		return fmt.Errorf("request failed - %q, response: %q", response.Status, string(body))
 	}
 
-	kubeletAddr := "[unknown]"
-	if req.URL != nil {
-		kubeletAddr = req.URL.Host
-	}
-	log.Infof("Raw response from Kubelet at %s: %s", kubeletAddr, string(body))
+	//kubeletAddr := "[unknown]"
+	//if req.URL != nil {
+	//	kubeletAddr = req.URL.Host
+	//}
+	//log.Infof("Raw response from Kubelet at %s: %s", kubeletAddr, string(body))
 
 	err = jsoniter.ConfigFastest.Unmarshal(body, value)
 	if err != nil {
